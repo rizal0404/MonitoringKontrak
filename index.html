@@ -8,25 +8,27 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css" />
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        #timeline { width: 100%; height: 400px; }
+        #timeline { width: 100%; height: 400px; margin-bottom: 20px; }
         .warning { color: red; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         tr.warning { background-color: #ffe6e6; }
-        .button { background-color: #4CAF50; border: none; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; }
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; }
-        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
-        .close:hover, .close:focus { color: black; text-decoration: none; cursor: pointer; }
+        button { margin: 10px 0; padding: 5px 10px; }
+        #editForm, #addForm { display: none; margin-top: 20px; }
+        #editForm input, #addForm input { margin: 5px 0; padding: 5px; width: 200px; }
+        #showMonths { margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <h1>Kontrak/Izin Timeline Dashboard</h1>
-    <button id="showMonths" class="button">Tampilkan/Sembunyikan Bulan</button>
+    <div>
+        <input type="checkbox" id="showMonths" onchange="updateTimeline()">
+        <label for="showMonths">Tampilkan bulan pada timeline</label>
+    </div>
     <div id="timeline"></div>
     <div id="warning"></div>
-    <button id="addData" class="button">Tambah Data Baru</button>
+    <button onclick="showAddForm()">Tambah Data Baru</button>
     <table id="dataTable">
         <thead>
             <tr>
@@ -43,35 +45,57 @@
         <tbody></tbody>
     </table>
 
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Edit Data</h2>
-            <form id="editForm">
-                <input type="hidden" id="editNo">
-                <label for="editNama">Nama Kontrak/Izin:</label>
-                <input type="text" id="editNama" required><br><br>
-                <label for="editVendor">Vendor:</label>
-                <input type="text" id="editVendor" required><br><br>
-                <label for="editTglBerlaku">Tgl Berlaku:</label>
-                <input type="date" id="editTglBerlaku" required><br><br>
-                <label for="editTglBerakhir">Tgl Berakhir:</label>
-                <input type="date" id="editTglBerakhir" required><br><br>
-                <button type="submit">Simpan</button>
-            </form>
-        </div>
+    <div id="editForm">
+        <h3>Edit Data</h3>
+        <input type="hidden" id="editNo">
+        <input type="text" id="editNama" placeholder="Nama Kontrak/Izin">
+        <input type="text" id="editVendor" placeholder="Vendor">
+        <input type="date" id="editTglBerlaku">
+        <input type="date" id="editTglBerakhir">
+        <button onclick="saveEdit()">Simpan</button>
+        <button onclick="cancelEdit()">Batal</button>
+    </div>
+
+    <div id="addForm">
+        <h3>Tambah Data Baru</h3>
+        <input type="text" id="addNama" placeholder="Nama Kontrak/Izin">
+        <input type="text" id="addVendor" placeholder="Vendor">
+        <input type="date" id="addTglBerlaku">
+        <input type="date" id="addTglBerakhir">
+        <button onclick="addData()">Tambah</button>
+        <button onclick="cancelAdd()">Batal</button>
     </div>
 
     <script>
-        let data = [
-            { No: 1, "Nama Kontrak/Izin": "Kontrak Jasa Servis X-RF", Vendor: "PT. Athna", "Tgl Berlaku": "2022-01-01", "Tgl Berakhir": "2025-01-01", Durasi: "3 Thn 0 Bln 0 Hri", "Sisa Berlaku": "0 Thn 4 Bln 25 Hri" },
-            { No: 2, "Nama Kontrak/Izin": "Kontrak Jasa kalibrasi Sucofindo", Vendor: "PT. Sucofindo", "Tgl Berlaku": "2023-03-01", "Tgl Berakhir": "2024-12-31", Durasi: "1 Thn 9 Bln 30 Hri", "Sisa Berlaku": "0 Thn 4 Bln 24 Hri" },
-            { No: 3, "Nama Kontrak/Izin": "Kontrak Jasa TLD Badge", Vendor: "Nuklindolab", "Tgl Berlaku": "2024-01-01", "Tgl Berakhir": "2025-12-31", Durasi: "1 Thn 11 Bln 30 Hri", "Sisa Berlaku": "1 Thn 4 Bln 24 Hri" },
-            { No: 4, "Nama Kontrak/Izin": "KTUN SRP QC & QA", Vendor: "BAPETEN", "Tgl Berlaku": "2024-07-22", "Tgl Berakhir": "2027-06-26", Durasi: "2 Thn 11 Bln 4 Hri", "Sisa Berlaku": "2 Thn 10 Bln 19 Hri" }
-        ];
+        const scriptUrl = 'https://script.google.com/macros/s/AKfycbxARvoxrnT0aoKGHYDCf6mapzmiBH-uLJPRIkQ3kFOhVek7NQOwjhWd_H-mWC_EU17D/exec'; // Ganti dengan URL Web App dari Apps Script Anda
 
+        let data = [];
         let timeline;
-        let showMonths = false;
+
+        async function loadData() {
+            try {
+                const response = await fetch(scriptUrl);
+                data = await response.json();
+                updateDashboard();
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        async function saveData() {
+            try {
+                const response = await fetch(scriptUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                });
+                const result = await response.json();
+                if (result.result !== 'success') {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Error saving data:', error);
+            }
+        }
 
         function createTimeline() {
             const container = document.getElementById('timeline');
@@ -85,18 +109,30 @@
             const options = {
                 start: new Date('2022-01-01'),
                 end: new Date('2027-12-31'),
-                timeAxis: { scale: showMonths ? 'month' : 'year', step: 1 }
+                timeAxis: { scale: 'year', step: 1 }
             };
 
             timeline = new vis.Timeline(container, items, options);
         }
 
-        function updateTable() {
+        function updateTimeline() {
+            const showMonths = document.getElementById('showMonths').checked;
+            timeline.setOptions({
+                timeAxis: { scale: showMonths ? 'month' : 'year', step: 1 }
+            });
+        }
+
+        function checkWarnings() {
+            const today = new Date();
+            const sixMonthsLater = new Date(today.setMonth(today.getMonth() + 6));
+            const warningDiv = document.getElementById('warning');
             const tableBody = document.querySelector('#dataTable tbody');
+
             tableBody.innerHTML = '';
             data.forEach(row => {
+                const endDate = new Date(row['Tgl Berakhir']);
                 const tr = document.createElement('tr');
-                if (isWithinSixMonths(row['Tgl Berakhir'])) {
+                if (endDate <= sixMonthsLater) {
                     tr.classList.add('warning');
                 }
                 tr.innerHTML = `
@@ -107,108 +143,104 @@
                     <td>${row['Tgl Berakhir']}</td>
                     <td>${row.Durasi}</td>
                     <td>${row['Sisa Berlaku']}</td>
-                    <td><button onclick="editData(${row.No})">Edit</button></td>
+                    <td>
+                        <button onclick="editData(${row.No})">Edit</button>
+                        <button onclick="deleteData(${row.No})">Hapus</button>
+                    </td>
                 `;
                 tableBody.appendChild(tr);
             });
+
+            const warnings = data.filter(row => new Date(row['Tgl Berakhir']) <= sixMonthsLater);
+            warningDiv.innerHTML = warnings.length > 0 ? `<p class="warning">Perhatian: Ada ${warnings.length} kontrak/izin yang berakhir dalam 6 bulan.</p>` : '';
         }
 
-        function checkWarnings() {
-            const warningDiv = document.getElementById('warning');
-            warningDiv.innerHTML = '';
-            const warnings = data.filter(row => isWithinSixMonths(row['Tgl Berakhir']));
-            if (warnings.length > 0) {
-                warningDiv.innerHTML = '<h2 class="warning">Peringatan:</h2>';
-                warnings.forEach(row => {
-                    warningDiv.innerHTML += `<p>${row['Nama Kontrak/Izin']} akan berakhir pada ${row['Tgl Berakhir']}</p>`;
-                });
-            }
+        function updateDashboard() {
+            createTimeline();
+            checkWarnings();
         }
 
-        function isWithinSixMonths(dateString) {
-            const today = new Date();
-            const sixMonthsLater = new Date(today.setMonth(today.getMonth() + 6));
-            return new Date(dateString) <= sixMonthsLater;
+        function showAddForm() {
+            document.getElementById('addForm').style.display = 'block';
+        }
+
+        function cancelAdd() {
+            document.getElementById('addForm').style.display = 'none';
+        }
+
+        function addData() {
+            const nama = document.getElementById('addNama').value;
+            const vendor = document.getElementById('addVendor').value;
+            const tglBerlaku = document.getElementById('addTglBerlaku').value;
+            const tglBerakhir = document.getElementById('addTglBerakhir').value;
+
+            const durasi = Math.ceil((new Date(tglBerakhir) - new Date(tglBerlaku)) / (1000 * 60 * 60 * 24));
+            const sisaBerlaku = Math.ceil((new Date(tglBerakhir) - new Date()) / (1000 * 60 * 60 * 24));
+
+            const newRow = {
+                No: data.length + 1,
+                "Nama Kontrak/Izin": nama,
+                Vendor: vendor,
+                "Tgl Berlaku": tglBerlaku,
+                "Tgl Berakhir": tglBerakhir,
+                Durasi: durasi,
+                "Sisa Berlaku": sisaBerlaku
+            };
+
+            data.push(newRow);
+            updateDashboard();
+            saveData();
+            cancelAdd();
         }
 
         function editData(no) {
             const row = data.find(r => r.No === no);
-            document.getElementById('editNo').value = row.No;
-            document.getElementById('editNama').value = row['Nama Kontrak/Izin'];
-            document.getElementById('editVendor').value = row.Vendor;
-            document.getElementById('editTglBerlaku').value = row['Tgl Berlaku'];
-            document.getElementById('editTglBerakhir').value = row['Tgl Berakhir'];
-            document.getElementById('editModal').style.display = 'block';
+            if (row) {
+                document.getElementById('editNo').value = row.No;
+                document.getElementById('editNama').value = row['Nama Kontrak/Izin'];
+                document.getElementById('editVendor').value = row.Vendor;
+                document.getElementById('editTglBerlaku').value = row['Tgl Berlaku'];
+                document.getElementById('editTglBerakhir').value = row['Tgl Berakhir'];
+                document.getElementById('editForm').style.display = 'block';
+            }
         }
 
-        document.getElementById('editForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const no = parseInt(document.getElementById('editNo').value);
-            const row = data.find(r => r.No === no);
-            row['Nama Kontrak/Izin'] = document.getElementById('editNama').value;
-            row.Vendor = document.getElementById('editVendor').value;
-            row['Tgl Berlaku'] = document.getElementById('editTglBerlaku').value;
-            row['Tgl Berakhir'] = document.getElementById('editTglBerakhir').value;
-            row.Durasi = calculateDuration(row['Tgl Berlaku'], row['Tgl Berakhir']);
-            row['Sisa Berlaku'] = calculateRemaining(row['Tgl Berakhir']);
-            document.getElementById('editModal').style.display = 'none';
-            updateTable();
-            checkWarnings();
-            createTimeline();
-        });
-
-        document.querySelector('.close').addEventListener('click', function() {
-            document.getElementById('editModal').style.display = 'none';
-        });
-
-        document.getElementById('addData').addEventListener('click', function() {
-            const newNo = Math.max(...data.map(r => r.No)) + 1;
-            const newRow = {
-                No: newNo,
-                "Nama Kontrak/Izin": "Kontrak Baru",
-                Vendor: "Vendor Baru",
-                "Tgl Berlaku": new Date().toISOString().split('T')[0],
-                "Tgl Berakhir": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-                Durasi: "1 Thn 0 Bln 0 Hri",
-                "Sisa Berlaku": "1 Thn 0 Bln 0 Hri"
-            };
-            data.push(newRow);
-            updateTable();
-            checkWarnings();
-            createTimeline();
-            editData(newNo);
-        });
-
-        document.getElementById('showMonths').addEventListener('click', function() {
-            showMonths = !showMonths;
-            createTimeline();
-        });
-
-        function calculateDuration(start, end) {
-            const startDate = new Date(start);
-            const endDate = new Date(end);
-            const diffTime = Math.abs(endDate - startDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            const years = Math.floor(diffDays / 365);
-            const months = Math.floor((diffDays % 365) / 30);
-            const days = diffDays % 30;
-            return `${years} Thn ${months} Bln ${days} Hri`;
+        function cancelEdit() {
+            document.getElementById('editForm').style.display = 'none';
         }
 
-        function calculateRemaining(end) {
-            const today = new Date();
-            const endDate = new Date(end);
-            const diffTime = Math.abs(endDate - today);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            const years = Math.floor(diffDays / 365);
-            const months = Math.floor((diffDays % 365) / 30);
-            const days = diffDays % 30;
-            return `${years} Thn ${months} Bln ${days} Hri`;
+        function saveEdit() {
+            const no = document.getElementById('editNo').value;
+            const nama = document.getElementById('editNama').value;
+            const vendor = document.getElementById('editVendor').value;
+            const tglBerlaku = document.getElementById('editTglBerlaku').value;
+            const tglBerakhir = document.getElementById('editTglBerakhir').value;
+
+            const durasi = Math.ceil((new Date(tglBerakhir) - new Date(tglBerlaku)) / (1000 * 60 * 60 * 24));
+            const sisaBerlaku = Math.ceil((new Date(tglBerakhir) - new Date()) / (1000 * 60 * 60 * 24));
+
+            const row = data.find(r => r.No == no);
+            if (row) {
+                row['Nama Kontrak/Izin'] = nama;
+                row.Vendor = vendor;
+                row['Tgl Berlaku'] = tglBerlaku;
+                row['Tgl Berakhir'] = tglBerakhir;
+                row.Durasi = durasi;
+                row['Sisa Berlaku'] = sisaBerlaku;
+
+                updateDashboard();
+                saveData();
+                cancelEdit();
+            }
         }
 
-        createTimeline();
-        updateTable();
-        checkWarnings();
+        function deleteData(no) {
+            data = data.filter(r => r.No !== no);
+            updateDashboard();
+            saveData();
+        }
+
+        loadData();
     </script>
 </body>
 </html>
