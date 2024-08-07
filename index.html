@@ -105,12 +105,24 @@ function createTimeline() {
         container.removeChild(container.firstChild);
     }
 
-    const items = data.map((row, index) => ({
-        id: index + 1,
-        content: row['Nama Kontrak/Izin'],
-        start: row['Tgl Berlaku'],
-        end: row['Tgl Berakhir']
-    }));
+    const groups = [];
+    const items = [];
+
+    data.forEach((row, index) => {
+        // Tambahkan grup baru untuk setiap kontrak/izin
+        groups.push({
+            id: index + 1,
+            content: row['Nama Kontrak/Izin']
+        });
+
+        items.push({
+            id: index + 1,
+            group: index + 1,
+            content: row['Nama Kontrak/Izin'],
+            start: row['Tgl Berlaku'],
+            end: row['Tgl Berakhir']
+        });
+    });
 
     const options = {
         stack: false,
@@ -130,8 +142,9 @@ function createTimeline() {
         }
     };
 
-    const timeline = new vis.Timeline(container, items, options);
+    const timeline = new vis.Timeline(container, items, groups, options);
 }
+
 
 
         function updateTimeline() {
